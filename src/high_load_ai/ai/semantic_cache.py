@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
+import struct
 
 from redis.asyncio import Redis
 
@@ -13,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 def _pseudo_embedding(text: str, dimensions: int) -> list[float]:
     """Deterministic pseudo-embedding for tests and air-gapped mode."""
-    import hashlib
-
     vec: list[float] = []
     seed = hashlib.sha256(text.encode("utf-8")).digest()
     for i in range(dimensions):
@@ -32,15 +32,23 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb)
 
 
+def _bucket_id(vec: list[float], bits: int) -> int:
+    h = hashlib.sha256()
+    for x in vec[: min(64, len(vec))]:
+        h.update(struct.pack("f", float(x)))
+    digest: int = int(h.hexdigest()[:12], 16)
+    modulus = int(2**bits)
+    return digest % modulus
+
+
 class SemanticLlmCache:
     """
-    Redis-backed semantic cache using linear scan over a capped index of (vector, text).
+    Redis-backed semantic cache: vectors grouped into buckets to cap scan cost.
 
-    Suitable for template scale; replace with vector index (RediSearch / dedicated DB) at scale.
+    At very large scale, replace with RediSearch or an external vector index.
     """
 
-    index_key = "sem:llm:index"
-    max_entries = 200
+    max_entries_per_bucket = 200
 
     def __init__(self, redis: Redis, settings: Settings) -> None:
         self._redis = redis
@@ -49,9 +57,12 @@ class SemanticLlmCache:
     def enabled(self) -> bool:
         return self._settings.semantic_cache_enabled and not self._settings.llm_stub_enabled
 
+    def _bucket_key(self, vec: list[float]) -> str:
+        b = _bucket_id(vec, self._settings.semantic_cache_bucket_bits)
+        return f"sem:llm:bkt:{b}"
+
     async def _embed(self, prompt: str) -> list[float]:
         if self._settings.semantic_cache_embed_mode == "openai":
-            # Lazy import to keep test environments light when unused
             from langchain_openai import OpenAIEmbeddings
             from pydantic import SecretStr
 
@@ -70,7 +81,8 @@ class SemanticLlmCache:
             return None
 
         vec = await self._embed(prompt)
-        raw_items = await self._redis.lrange(self.index_key, 0, self.max_entries - 1)  # type: ignore[misc]
+        bkey = self._bucket_key(vec)
+        raw_items = await self._redis.lrange(bkey, 0, self.max_entries_per_bucket - 1)  # type: ignore[misc]
         best_text: str | None = None
         best_score = self._settings.semantic_cache_min_similarity
 
@@ -89,7 +101,7 @@ class SemanticLlmCache:
                 best_text = text
 
         if best_text is not None:
-            logger.info("semantic_cache_hit similarity=%.4f", best_score)
+            logger.info("semantic_cache_hit bucket=%s similarity=%.4f", bkey, best_score)
         return best_text
 
     async def store(self, prompt: str, text: str) -> None:
@@ -97,6 +109,7 @@ class SemanticLlmCache:
             return
 
         vec = await self._embed(prompt)
+        bkey = self._bucket_key(vec)
         payload = json.dumps({"vec": vec, "text": text})
-        await self._redis.lpush(self.index_key, payload)  # type: ignore[misc]
-        await self._redis.ltrim(self.index_key, 0, self.max_entries - 1)  # type: ignore[misc]
+        await self._redis.lpush(bkey, payload)  # type: ignore[misc]
+        await self._redis.ltrim(bkey, 0, self.max_entries_per_bucket - 1)  # type: ignore[misc]

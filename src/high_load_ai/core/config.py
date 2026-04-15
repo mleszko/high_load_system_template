@@ -87,6 +87,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    llm_fallback_on_timeout: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LLM_FALLBACK_ON_TIMEOUT", "llm_fallback_on_timeout"),
+    )
+    llm_fallback_on_429: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LLM_FALLBACK_ON_429", "llm_fallback_on_429"),
+    )
+    llm_fallback_on_5xx: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LLM_FALLBACK_ON_5XX", "llm_fallback_on_5xx"),
+    )
+    llm_fallback_on_other: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LLM_FALLBACK_ON_OTHER", "llm_fallback_on_other"),
+    )
+
     exact_cache_enabled: bool = Field(
         default=True,
         validation_alias=AliasChoices("EXACT_CACHE_ENABLED", "exact_cache_enabled"),
@@ -115,6 +132,12 @@ class Settings(BaseSettings):
     semantic_cache_hash_dimensions: int = Field(
         default=32,
         validation_alias=AliasChoices("SEMANTIC_CACHE_HASH_DIM", "semantic_cache_hash_dimensions"),
+    )
+    semantic_cache_bucket_bits: int = Field(
+        default=8,
+        ge=1,
+        le=16,
+        validation_alias=AliasChoices("SEMANTIC_CACHE_BUCKET_BITS", "semantic_cache_bucket_bits"),
     )
 
     gzip_minimum_size: int = Field(

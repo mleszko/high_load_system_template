@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from high_load_ai.ai.circuit_breaker import CircuitBreakerState
+from high_load_ai.ai.fallback_policy import FallbackPolicy
 from high_load_ai.ai.resilient_llm import ResilientLlmExecutor
 from high_load_ai.ai.runner import LangGraphExecutor
 from high_load_ai.ai.semantic_cache import SemanticLlmCache
@@ -71,7 +72,13 @@ def build_container() -> Container:
             fail_max=settings.circuit_breaker_fail_max,
             reset_timeout_seconds=settings.circuit_breaker_reset_seconds,
         )
-        llm_executor = ResilientLlmExecutor(primary, fallback, breaker)
+        policy = FallbackPolicy(
+            on_timeout=settings.llm_fallback_on_timeout,
+            on_429=settings.llm_fallback_on_429,
+            on_5xx=settings.llm_fallback_on_5xx,
+            on_other=settings.llm_fallback_on_other,
+        )
+        llm_executor = ResilientLlmExecutor(primary, fallback, breaker, policy, settings)
 
     graph_executor = LangGraphExecutor(llm_executor, semantic_cache)
 

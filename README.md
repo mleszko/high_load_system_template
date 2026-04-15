@@ -2,6 +2,10 @@
 
 A production-ready template for building high-load, privacy-aware AI microservices using FastAPI, LangGraph, Redis, Celery, and self-hosted Langfuse.
 
+## Documentation
+
+Full guides: **[docs/README.md](docs/README.md)** (architecture, caching, reliability, observability, API contract, load testing, runbooks).
+
 ## Architecture
 
 This template enforces strict layer boundaries:
@@ -69,7 +73,7 @@ pytest
 
 ## Load testing
 
-See `tests/load/README.md` for **k6** and **Locust** scenarios against SSE and rate limits.
+See [docs/performance/load-testing.md](docs/performance/load-testing.md) and `tests/load/README.md` for **k6** and **Locust** (including rate-limit scenarios).
 
 ## API quickstart
 

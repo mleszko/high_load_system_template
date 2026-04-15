@@ -4,13 +4,14 @@ import json
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketException, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, status
 from sse_starlette import EventSourceResponse
 
 from high_load_ai.api.dependencies import enforce_rate_limit, get_container
 from high_load_ai.api.schemas.runs import CreateRunRequest, CreateRunResponse, RunResponse
 from high_load_ai.core.container import Container, build_langchain_callbacks
-from high_load_ai.core.context import get_correlation_id
+from high_load_ai.core.context import get_correlation_id, set_correlation_id
+from high_load_ai.core.security import verify_api_key_from_headers
 from high_load_ai.domain.services import StartAgentRunService, StreamAgentRunService
 from high_load_ai.infrastructure.tasks.tasks import finalize_run
 
@@ -82,20 +83,35 @@ async def stream_run(
 
 @router.websocket("/{run_id}/ws")
 async def stream_run_ws(websocket: WebSocket, run_id: str) -> None:
+    api_key = verify_api_key_from_headers(
+        websocket.headers.get("x-api-key"),
+        websocket.headers.get("authorization"),
+    )
+    if api_key is None:
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+
+    cid_header = websocket.headers.get("x-correlation-id")
+    if cid_header:
+        set_correlation_id(cid_header.strip())
+
     await websocket.accept()
     container: Container = websocket.app.state.container
-    run = await container.run_repository.get(UUID(run_id))
-    if run is None:
-        await websocket.close(code=1008)
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+    try:
+        run = await container.run_repository.get(UUID(run_id))
+        if run is None:
+            await websocket.close(code=1008, reason="Run not found")
+            return
 
-    service = StreamAgentRunService(
-        container.run_repository,
-        container.graph_executor,
-        container.tracer,
-        exact_run_cache=container.exact_run_cache,
-    )
-    callbacks = build_langchain_callbacks(container.tracer)
-    async for event in service.execute(run, callbacks=callbacks):
-        await websocket.send_json(event)
-    await websocket.close()
+        service = StreamAgentRunService(
+            container.run_repository,
+            container.graph_executor,
+            container.tracer,
+            exact_run_cache=container.exact_run_cache,
+        )
+        callbacks = build_langchain_callbacks(container.tracer)
+        async for event in service.execute(run, callbacks=callbacks):
+            await websocket.send_json(event)
+    finally:
+        set_correlation_id(None)
+        await websocket.close()

@@ -1,6 +1,6 @@
 # PLAN: high_load_system_template
 
-This document is the authoritative implementation roadmap. **Implementation pauses until you type `continue` after each agreed batch of work.** (This revision updates the plan only; no feature code is implied until you approve execution.)
+This document is the authoritative roadmap. **Deep-dive documentation** lives under [`docs/`](docs/README.md). Implementation status is summarized below; new work should update this section when merging.
 
 ## Acknowledged additions (this revision)
 
@@ -36,6 +36,7 @@ The following are now **first-class requirements** for a production-grade, high-
 ```text
 high_load_system_template/
 ├── PLAN.md
+├── docs/
 ├── pyproject.toml
 ├── README.md
 ├── docker-compose.yml
@@ -138,8 +139,27 @@ Phases **0–8** from the prior plan remain the backbone. The following **extend
 
 ---
 
-## Execution contract
+## Current implementation status (living)
 
-1. Updates to this `PLAN.md` are complete with this revision.  
-2. **No implementation code** will be written until you send **`continue`**.  
-3. After `continue`, work proceeds in **small batches** (cache → breaker → correlation → gzip → load tests), with commits per batch.
+| Theme | Status |
+|-------|--------|
+| Phases 0–9 (bootstrap → client) | **Done** in repo |
+| Exact Redis cache (`GET /v1/runs/{id}`) | **Done** |
+| Semantic LLM cache in `/ai` | **Done** (hash + OpenAI embed modes; bucketed Redis lists) |
+| Circuit breaker + fallback LLM | **Done** (v2: closed / open / half-open + policy flags) |
+| Correlation ID + logging + Celery | **Done** (worker `task_prerun` + `BackgroundTasks` helper) |
+| GZip middleware | **Done** |
+| Load tests (k6 + Locust + rate-limit script) | **Done**; CI workflow **manual** dispatch |
+| WebSocket API key auth | **Done** |
+| Docs under `docs/` | **Done** |
+
+## Backlog (optional hardening)
+
+- RediSearch / external vector DB for semantic cache at very large scale.
+- Metrics export (Prometheus) for breaker state and cache hit ratio.
+- Stricter half-open single-flight (mutex) under concurrent probes.
+- Integration tests: forced 429/timeout classification paths.
+
+## Execution contract (historical)
+
+Batches were delivered incrementally (`continue` per batch). Further changes should follow small PRs and update **Current implementation status** above.

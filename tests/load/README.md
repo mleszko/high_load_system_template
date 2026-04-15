@@ -16,6 +16,14 @@ k6 run tests/load/k6-sse.js \
   -e API_KEY=dev-key
 ```
 
+Rate-limit stress (lower `RATE_LIMIT_MAX_REQUESTS` in the API first):
+
+```bash
+k6 run tests/load/k6-rate-limit.js \
+  -e BASE_URL=http://localhost:8000 \
+  -e API_KEY=dev-key
+```
+
 ## Locust
 
 ```bash
