@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -57,9 +59,67 @@ class Settings(BaseSettings):
         default="gpt-4o-mini",
         validation_alias=AliasChoices("LLM_MODEL", "llm_model"),
     )
+    llm_fallback_model: str = Field(
+        default="gpt-4o-mini",
+        validation_alias=AliasChoices("LLM_FALLBACK_MODEL", "llm_fallback_model"),
+    )
     llm_timeout_seconds: float = Field(
         default=45.0,
         validation_alias=AliasChoices("LLM_TIMEOUT_SECONDS", "llm_timeout_seconds"),
+    )
+    llm_fallback_timeout_seconds: float = Field(
+        default=30.0,
+        validation_alias=AliasChoices(
+            "LLM_FALLBACK_TIMEOUT_SECONDS",
+            "llm_fallback_timeout_seconds",
+        ),
+    )
+
+    circuit_breaker_fail_max: int = Field(
+        default=5,
+        validation_alias=AliasChoices("CIRCUIT_BREAKER_FAIL_MAX", "circuit_breaker_fail_max"),
+    )
+    circuit_breaker_reset_seconds: float = Field(
+        default=30.0,
+        validation_alias=AliasChoices(
+            "CIRCUIT_BREAKER_RESET_SECONDS",
+            "circuit_breaker_reset_seconds",
+        ),
+    )
+
+    exact_cache_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("EXACT_CACHE_ENABLED", "exact_cache_enabled"),
+    )
+    exact_run_cache_ttl_seconds: int = Field(
+        default=30,
+        validation_alias=AliasChoices("EXACT_RUN_CACHE_TTL_SECONDS", "exact_run_cache_ttl_seconds"),
+    )
+
+    semantic_cache_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("SEMANTIC_CACHE_ENABLED", "semantic_cache_enabled"),
+    )
+    semantic_cache_embed_mode: Literal["hash", "openai"] = Field(
+        default="hash",
+        validation_alias=AliasChoices("SEMANTIC_CACHE_EMBED_MODE", "semantic_cache_embed_mode"),
+    )
+    semantic_cache_embed_model: str = Field(
+        default="text-embedding-3-small",
+        validation_alias=AliasChoices("SEMANTIC_CACHE_EMBED_MODEL", "semantic_cache_embed_model"),
+    )
+    semantic_cache_min_similarity: float = Field(
+        default=0.92,
+        validation_alias=AliasChoices("SEMANTIC_CACHE_MIN_SIMILARITY", "semantic_cache_min_similarity"),
+    )
+    semantic_cache_hash_dimensions: int = Field(
+        default=32,
+        validation_alias=AliasChoices("SEMANTIC_CACHE_HASH_DIM", "semantic_cache_hash_dimensions"),
+    )
+
+    gzip_minimum_size: int = Field(
+        default=1000,
+        validation_alias=AliasChoices("GZIP_MINIMUM_SIZE", "gzip_minimum_size"),
     )
 
     llm_stub: bool = Field(

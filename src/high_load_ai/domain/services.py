@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
+from high_load_ai.core.context import get_correlation_id
 from high_load_ai.domain.models import AgentRun, RunId
 from high_load_ai.domain.ports import AgentExecutor, AgentRunRepository, Tracer
 
@@ -22,10 +23,13 @@ class StreamAgentRunService:
         repository: AgentRunRepository,
         executor: AgentExecutor,
         tracer: Tracer,
+        *,
+        exact_run_cache: Any | None = None,
     ) -> None:
         self._repository = repository
         self._executor = executor
         self._tracer = tracer
+        self._exact_run_cache = exact_run_cache
 
     async def execute(
         self,
@@ -33,9 +37,14 @@ class StreamAgentRunService:
         *,
         callbacks: list[Any] | None = None,
     ) -> AsyncIterator[dict[str, str]]:
-        span = self._tracer.start_span("agent_run_stream", {"run_id": str(run.id)})
+        meta = {"run_id": str(run.id)}
+        if cid := get_correlation_id():
+            meta["correlation_id"] = cid
+        span = self._tracer.start_span("agent_run_stream", meta)
         run.mark_running()
         await self._repository.update(run)
+        if self._exact_run_cache is not None:
+            await self._exact_run_cache.delete(str(run.id))
 
         output: list[str] = []
         try:
@@ -53,3 +62,6 @@ class StreamAgentRunService:
             await self._repository.update(run)
             self._tracer.end_span(span, status="error")
             yield {"event": "error", "data": str(exc)}
+        finally:
+            if self._exact_run_cache is not None:
+                await self._exact_run_cache.delete(str(run.id))

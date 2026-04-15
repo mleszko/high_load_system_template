@@ -10,7 +10,7 @@ This template enforces strict layer boundaries:
 - `src/high_load_ai/core`: config, DI composition, security, exceptions.
 - `src/high_load_ai/domain`: pure business models, ports, and use cases.
 - `src/high_load_ai/infrastructure`: SQLAlchemy repos, Redis limiter, Celery tasks, LLM adapter.
-- `src/high_load_ai/ai`: isolated LangGraph state, prompts, graph, and runner.
+- `src/high_load_ai/ai`: isolated LangGraph state, prompts, graph, runner, **semantic LLM cache**, **circuit breaker** + fallback wiring.
 - `deploy`: Azure Bicep templates for Container Apps.
 - `client`: Next.js TypeScript streaming demo client.
 
@@ -58,6 +58,18 @@ ruff check /workspace/src /workspace/tests
 mypy --config-file /workspace/pyproject.toml
 pytest
 ```
+
+## Caching, resilience, and tracing
+
+- **Exact Redis cache**: `GET /v1/runs/{id}` uses a short-TTL Redis cache when `EXACT_CACHE_ENABLED=true` (default). Streaming invalidates the cache for that run.
+- **Semantic LLM cache**: enable with `SEMANTIC_CACHE_ENABLED=true`. Default embedding mode is deterministic `hash` (no external calls). Set `SEMANTIC_CACHE_EMBED_MODE=openai` to use OpenAI-compatible embeddings via `LLM_BASE_URL` / `LLM_API_KEY`.
+- **Circuit breaker + fallback**: primary model `LLM_MODEL` with fallback `LLM_FALLBACK_MODEL` (same API base by default). Tune `CIRCUIT_BREAKER_FAIL_MAX` and `CIRCUIT_BREAKER_RESET_SECONDS`.
+- **Correlation ID**: send `X-Correlation-ID` or receive one in the response; included in logs (`[cid=...]`) and passed to Celery `finalize_run`. LangChain callbacks receive `correlation_id` in metadata when tracing is enabled.
+- **GZip**: `GZipMiddleware` compresses responses over `GZIP_MINIMUM_SIZE` bytes (SSE streams are typically small / event-based).
+
+## Load testing
+
+See `tests/load/README.md` for **k6** and **Locust** scenarios against SSE and rate limits.
 
 ## API quickstart
 

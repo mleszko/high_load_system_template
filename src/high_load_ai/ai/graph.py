@@ -10,6 +10,9 @@ from high_load_ai.domain.ports import AgentExecutor
 
 def build_graph(executor: AgentExecutor) -> StateGraph[Any, Any, Any, Any]:
     async def run_model(state: AgentGraphState) -> AgentGraphState:
+        if state.get("response"):
+            return {"response": state["response"], "callbacks": state.get("callbacks", [])}
+
         prompt = state.get("prompt", "")
         run_id = state.get("run_id", "")
         callbacks = state.get("callbacks", [])

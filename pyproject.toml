@@ -38,6 +38,7 @@ dev = [
   "fakeredis[lua]>=2.23.0",
   "mypy>=1.13.0",
   "ruff>=0.8.0",
+  "locust>=2.31.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -73,3 +74,4 @@ asyncio_mode = "auto"
 [tool.ruff.lint.per-file-ignores]
 "src/high_load_ai/api/dependencies.py" = ["B008"]
 "src/high_load_ai/api/routers/runs.py" = ["B008"]
+"tests/load/locustfile.py" = ["I001"]

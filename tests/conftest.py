@@ -43,7 +43,7 @@ def test_container() -> Container:
     from high_load_ai.infrastructure.llm.stub import StubLlmExecutor
 
     llm_executor: AgentExecutor = StubLlmExecutor()
-    graph_executor: AgentExecutor = LangGraphExecutor(llm_executor)
+    graph_executor: AgentExecutor = LangGraphExecutor(llm_executor, semantic_cache=None)
     tracer: Tracer = NoopTracer()
 
     return Container(
@@ -52,6 +52,7 @@ def test_container() -> Container:
         session_factory=session_factory,
         run_repository=run_repository,
         rate_limiter=rate_limiter,
+        exact_run_cache=None,
         llm_executor=llm_executor,
         graph_executor=graph_executor,
         tracer=tracer,
